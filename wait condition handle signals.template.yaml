@@ -1,0 +1,50 @@
+Parameters:
+  Image:
+    Type: String
+    Default: ami-a4c7edb2
+    Description: The default AMI above is for US-EAST-1 region
+  InstanceType:
+    Type: String 
+    Default: t2.micro
+  Keypair:
+    Type: String 
+  Subnet:
+    Type: String 
+  InstanceProfile:
+    Type: String 
+    Description: If you have a VPC endpoint, you must give an instance profile with S3* permissions to the cloudformation-waitcondition-us-east-1 bucket to signal successfully    
+    
+Resources:
+  MyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref Image
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref Keypair
+      SubnetId: !Ref Subnet
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData: 
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y aws-cfn-bootstrap
+            curl -X PUT -H 'Content-Type:' --data-binary '{"Status" : "FAILURE","Reason" : "A custom reason only shown on failure","UniqueId" : "12345","Data" : "I am Data and can be seen in Outputs"}' "${WaitHandle}"
+
+    
+        
+  WaitHandle: 
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+  WaitCondition: 
+    Type: "AWS::CloudFormation::WaitCondition"
+    DependsOn: MyInstance
+    Properties: 
+      Handle: 
+        Ref: "WaitHandle"
+      Timeout: "300"
+      Count: 1
+      
+Outputs:
+  WaitConditionData:
+    Value: 
+      Fn::GetAtt: ["WaitCondition", "Data"]
+    Description: "Data passed back as part of signaling the WaitCondition"
